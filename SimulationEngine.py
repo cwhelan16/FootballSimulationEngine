@@ -6,6 +6,7 @@ Created on Thu Aug 31 10:31:49 2023
 """
 
 import numpy as np
+import pandas as pd
 
 def get_rates(hometeam,awayteam,dataset,num_games=10,method=1):
     '''
@@ -16,25 +17,25 @@ def get_rates(hometeam,awayteam,dataset,num_games=10,method=1):
     dataset - dataset of historical results. This function expects the dataset input to have the following columns:
         Date - of the given historical fixture
         HomeTeam - name of the home team in a given fixture
-        HomeTeamGoals - number of goals scored by HomeTeam in a given fixture
+        HomeGoals - number of goals scored by HomeTeam in a given fixture
         AwayTeam -name of the away team in a given fixture
-        AwayTeamGoals - number of goals scored in a given fixture
+        AwayGoals - number of goals scored in a given fixture
         Additionally, dataset must be sorted by descending Date (i.e. most recent historical fixtures occur first)
     num_games - number of historical figures to average over
     method - method for calculating the transition rates:
         1. Average of goals scored by team in the last num_games and goals conceded by their opponent in the last num_games
     '''
-    num_games_home=min(len(dataset.Date[(dataset.HomeTeam==hometeam)|(dataset.AwayTeam==hometeam)]),num_games)
-    dates_home=dataset.Date[(dataset.HomeTeam==hometeam)|(dataset.AwayTeam==hometeam)].reset_index(drop=True)
+    num_games_home=min(len(dataset.Datetime[(dataset.HomeTeam==hometeam)|(dataset.AwayTeam==hometeam)]),num_games)
+    dates_home=dataset.Datetime[(dataset.HomeTeam==hometeam)|(dataset.AwayTeam==hometeam)].reset_index(drop=True)
     earliest_date_home=dates_home[num_games_home-1]
-    home_goals_for=np.sum(dataset.HomeTeamGoals[dataset.HomeTeam==hometeam][dataset.Date>=earliest_date_home])+ np.sum(dataset.AwayTeamGoals[dataset.AwayTeam==hometeam][dataset.Date>=earliest_date_home])
-    home_goals_against=np.sum(dataset.AwayTeamGoals[dataset.HomeTeam==hometeam][dataset.Date>=earliest_date_home])+ np.sum(dataset.HomeTeamGoals[dataset.AwayTeam==hometeam][dataset.Date>=earliest_date_home])
+    home_goals_for=np.sum(dataset.HomeGoals[dataset.HomeTeam==hometeam][dataset.Datetime>=earliest_date_home])+ np.sum(dataset.AwayGoals[dataset.AwayTeam==hometeam][dataset.Datetime>=earliest_date_home])
+    home_goals_against=np.sum(dataset.AwayGoals[dataset.HomeTeam==hometeam][dataset.Datetime>=earliest_date_home])+ np.sum(dataset.HomeGoals[dataset.AwayTeam==hometeam][dataset.Datetime>=earliest_date_home])
     
-    num_games_away=min(len(dataset.Date[(dataset.AwayTeam==awayteam)|(dataset.HomeTeam==awayteam)]),num_games)
-    dates_away=dataset.Date[(dataset.AwayTeam==awayteam)|(dataset.HomeTeam==awayteam)].reset_index(drop=True)
+    num_games_away=min(len(dataset.Datetime[(dataset.AwayTeam==awayteam)|(dataset.HomeTeam==awayteam)]),num_games)
+    dates_away=dataset.Datetime[(dataset.AwayTeam==awayteam)|(dataset.HomeTeam==awayteam)].reset_index(drop=True)
     earliest_date_away=dates_away[num_games_away-1]
-    away_goals_for=np.sum(dataset.AwayTeamGoals[dataset.AwayTeam==awayteam][dataset.Date>=earliest_date_away])+ np.sum(dataset.HomeTeamGoals[dataset.HomeTeam==awayteam][dataset.Date>=earliest_date_away])
-    away_goals_against=np.sum(dataset.AwayTeamGoals[dataset.HomeTeam==awayteam][dataset.Date>=earliest_date_away])+ np.sum(dataset.HomeTeamGoals[dataset.AwayTeam==awayteam][dataset.Date>=earliest_date_away])
+    away_goals_for=np.sum(dataset.AwayGoals[dataset.AwayTeam==awayteam][dataset.Datetime>=earliest_date_away])+ np.sum(dataset.HomeGoals[dataset.HomeTeam==awayteam][dataset.Datetime>=earliest_date_away])
+    away_goals_against=np.sum(dataset.AwayGoals[dataset.HomeTeam==awayteam][dataset.Datetime>=earliest_date_away])+ np.sum(dataset.HomeGoals[dataset.AwayTeam==awayteam][dataset.Datetime>=earliest_date_away])
     
     if method==1:
         rate_home=(home_goals_for/num_games_home + away_goals_against/num_games_away)/2
@@ -78,3 +79,17 @@ def predict_result(hometeam,awayteam,dataset,num_games=10,method=1,num_simulatio
         res_out=None
     return {'ProbHomeWin':p_home_win,'ProbAwayWin':p_away_win,'ProbDraw':p_draw,'FullSimulatedResults':res_out}
 
+def predict_multiple_results(fixture_df,results_df,history=10,method=1,num_simulations=1000):
+    predictions=[]
+    hometeams=fixture_df.HomeTeam
+    awayteams=fixture_df.AwayTeam
+    dates=fixture_df.Datetime
+    for i in range(len(hometeams)):
+        matchinfo={'Datetime':dates[i],'HomeTeam':hometeams[i],'AwayTeam':awayteams[i]}
+        sim_res=predict_result(hometeams[i],awayteams[i],results_df,
+                               num_games=history, method=method, 
+                               num_simulations=num_simulations,
+                               return_all_sims=False)
+        entry={**matchinfo,**sim_res}
+        predictions.append(entry)
+    return pd.DataFrame(predictions)

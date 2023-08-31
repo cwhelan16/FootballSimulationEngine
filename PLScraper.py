@@ -12,11 +12,15 @@ from datetime import datetime
 
 def convert_dates(date_string):
     
-    yr=str(datetime.now().year)
+    
     date_string_split=date_string.split()
     wkday=date_string_split[0]
     day=date_string_split[1][:-2]
     mth=date_string_split[2]
+    if mth in ['August','September','October','November','December']:
+        yr=str(2023)
+    else:
+        yr=str(2024) #THIS IS REALLY CRAP BUT I WANTED A QUICK FIX
     
     tm=date_string_split[3]
     date_string_cleaned=" ".join([wkday,day,mth,yr,tm])
@@ -25,8 +29,14 @@ def convert_dates(date_string):
     dt=datetime.strptime(date_string_cleaned,dtformat)
     return dt
 
-def semiparsed_to_df(semiparsed):
-    keys=['Date','HomeTeam','HomeGoals','AwayGoals','KOTime','AwayTeam','Status']
+def semiparsed_to_df(semiparsed,fixtype='result'):
+    if fixtype not in ['result','fixture']:
+        print('Error: Invalid fixture type.')
+        return None
+    elif fixtype == 'result':
+        keys=['Date','HomeTeam','HomeGoals','AwayGoals','KOTime','AwayTeam','Status']
+    else: #fixture
+        keys=['Date','HomeTeam','HomeGoals','AwayGoals','KOTime','AwayTeam']
     list_results=[]
     date_tag='h4'
     for item in semiparsed:
@@ -34,7 +44,7 @@ def semiparsed_to_df(semiparsed):
             date=item.get_text()
         else:
             result_txt=item.get_text()
-            result_entry=[res for res in result_txt.replace('\n','').split('  ') if len(res)>0]
+            result_entry=[res.strip() for res in result_txt.replace('\n',' ').split('  ') if len(res)>0]
             result={}
             result['Date']=date
             for i in range(1,len(keys)):
@@ -45,17 +55,25 @@ def semiparsed_to_df(semiparsed):
     df['Datetime']=(df.Date + ' ' + df.KOTime).apply(convert_dates)
     df.drop(columns=['Date','KOTime'],inplace=True)    
     
-    cols_reordered=['Datetime','HomeTeam','HomeGoals','AwayTeam','AwayGoals','Status']
+    if fixtype=='result':
+        cols_reordered=['Datetime','HomeTeam','HomeGoals','AwayTeam','AwayGoals','Status']
+    else:#fixture
+        cols_reordered=['Datetime','HomeTeam','HomeGoals','AwayTeam','AwayGoals']
     df=df[cols_reordered]
     return df
     
 def scrape_pl_results():
     url='https://www.skysports.com/premier-league-results'
-    soup=BeautifulSoup(requests.get(url).text)
+    soup=BeautifulSoup(requests.get(url).text,features='lxml')
     tags=['h4','div'] #h4 tags contain the dates, div tags contain result information
     classes=['fixres__header2','fixres__item'] #corresponding classes
     s_parsed=soup.find_all(tags,class_=classes)
-    return(semiparsed_to_df(s_parsed))
+    return semiparsed_to_df(s_parsed)
 
-
-
+def scrape_pl_fixtures():
+    url='https://www.skysports.com/premier-league-fixtures'
+    soup=BeautifulSoup(requests.get(url).text,features='lxml')
+    tags=['h4','div'] #h4 tags contain the dates, div tags contain result information
+    classes=['fixres__header2','fixres__item'] #corresponding classes
+    s_parsed=soup.find_all(tags,class_=classes)
+    return semiparsed_to_df(s_parsed,fixtype='fixture')
