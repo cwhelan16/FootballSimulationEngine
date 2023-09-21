@@ -10,6 +10,8 @@ import requests
 import pandas as pd
 from datetime import datetime
 
+import manipulate
+
 def convert_dates(date_string):
     
     
@@ -39,6 +41,7 @@ def semiparsed_to_df(semiparsed,fixtype='result'):
         keys=['Date','HomeTeam','HomeGoals','AwayGoals','KOTime','AwayTeam']
     list_results=[]
     date_tag='h4'
+    num_cols=['HomeGoals','AwayGoals'] #numerical columns which are initially returned as strings
     for item in semiparsed:
         if str(item)[:len(date_tag)+1]=='<'+date_tag:
             date=item.get_text()
@@ -60,6 +63,7 @@ def semiparsed_to_df(semiparsed,fixtype='result'):
     else:#fixture
         cols_reordered=['Datetime','HomeTeam','HomeGoals','AwayTeam','AwayGoals']
     df=df[cols_reordered]
+    df=manipulate.df_strings_to_numbers(df,num_cols)
     return df
     
 def scrape_pl_results():
@@ -68,7 +72,9 @@ def scrape_pl_results():
     tags=['h4','div'] #h4 tags contain the dates, div tags contain result information
     classes=['fixres__header2','fixres__item'] #corresponding classes
     s_parsed=soup.find_all(tags,class_=classes)
-    return semiparsed_to_df(s_parsed)
+    
+    results_df=semiparsed_to_df(s_parsed)
+    return results_df
 
 def scrape_pl_fixtures():
     url='https://www.skysports.com/premier-league-fixtures'

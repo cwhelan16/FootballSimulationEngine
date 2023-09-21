@@ -46,10 +46,13 @@ def update_df(curr_df_name,new_df_name):
     newdf=sqldf(query,locals())
     return newdf
 
+def strings_to_numbers(s):
+    try:
+        return int(s)
+    except:
+        return float("NaN")
+    
 def df_strings_to_numbers(df,cols):
     for col in cols:
-        df[col]=df[col].apply(lambda x: int(x))
+        df[col]=df[col].apply(strings_to_numbers)
     return df
-
-
-
